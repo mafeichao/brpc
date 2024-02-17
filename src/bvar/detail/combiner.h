@@ -237,6 +237,7 @@ friend class GlobalValue<self_type>;
         ElementTp tls_value;
         butil::AutoLock guard(_lock);
         ResultTp ret = _global_result;
+        //Agent继承自LinkNode<Agent>，value会把父类向下强转为模版类型Agent，是合理的
         for (butil::LinkNode<Agent>* node = _agents.head();
              node != _agents.end(); node = node->next()) {
             node->value()->element.load(&tls_value);
