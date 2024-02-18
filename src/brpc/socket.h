@@ -130,6 +130,11 @@ struct SocketStat {
     uint64_t out_size_m;
     uint32_t in_num_messages_m;
     uint32_t out_num_messages_m;
+
+    uint64_t send_buf_size_s;
+    uint64_t recv_buf_size_s;
+    uint64_t send_buf_size_m;
+    uint64_t recv_buf_size_m;
 };
 
 struct SocketVarsCollector {

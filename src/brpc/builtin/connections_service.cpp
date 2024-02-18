@@ -130,10 +130,14 @@ void ConnectionsService::PrintConnections(
             "<th>In/s</th>"
             "<th>InBytes/m</th>"
             "<th>In/m</th>"
+            "<th>RecvBuf/s</th>"
+            "<th>RecvBuf/m</th>"
             "<th>OutBytes/s</th>"
             "<th>Out/s</th>"
             "<th>OutBytes/m</th>"
             "<th>Out/m</th>"
+            "<th>SendBuf/s</th>"
+            "<th>SendBuf/m</th>"
             "<th>Rtt/Var(ms)</th>"
             "<th>SocketId</th>"
             "</tr>\n";
@@ -143,8 +147,8 @@ void ConnectionsService::PrintConnections(
             os << "Local|RecentErr|nbreak|";
         }
         os << "SSL|Protocol    |fd   |"
-            "InBytes/s|In/s  |InBytes/m |In/m    |"
-            "OutBytes/s|Out/s |OutBytes/m|Out/m   |"
+            "InBytes/s|In/s  |InBytes/m |In/m    |RecvBuf/s|RecvBuf/m|"
+            "OutBytes/s|Out/s |OutBytes/m|Out/m   |SendBuf/s|SendBuf/m|"
             "Rtt/Var(ms)|SocketId\n";
     }
 
@@ -304,10 +308,14 @@ void ConnectionsService::PrintConnections(
                << min_width(stat.in_num_messages_s, 6) << bar
                << min_width(stat.in_size_m, 10) << bar
                << min_width(stat.in_num_messages_m, 8) << bar
+               << min_width(stat.recv_buf_size_s, 10) << bar
+               << min_width(stat.recv_buf_size_m/60, 10) << bar
                << min_width(stat.out_size_s, 10) << bar
                << min_width(stat.out_num_messages_s, 6) << bar
                << min_width(stat.out_size_m, 10) << bar
                << min_width(stat.out_num_messages_m, 8) << bar
+               << min_width(stat.send_buf_size_s, 10) << bar
+               << min_width(stat.send_buf_size_m/60, 10) << bar
                << min_width(rtt_display, 11) << bar;
         }
 

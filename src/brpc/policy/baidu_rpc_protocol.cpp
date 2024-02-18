@@ -244,9 +244,12 @@ void SendRpcResponse(int64_t correlation_id,
     if (span) {
         span->set_response_size(res_buf.size());
     }
+    LOG(INFO) << "attached_size:" << attached_size << ",res_size:" << res_buf.size() << ",fd:" << sock->fd();
+
     // Send rpc response over stream even if server side failed to create
     // stream for some reason.
     if(cntl->has_remote_stream()){
+        LOG(INFO) << "stream branch";
         // Send the response over stream to notify that this stream connection
         // is successfully built.
         // Response_stream can be INVALID_STREAM_ID when error occurs.
@@ -273,6 +276,7 @@ void SendRpcResponse(int64_t correlation_id,
         // users to set max_concurrency.
         Socket::WriteOptions wopt;
         wopt.ignore_eovercrowded = true;
+        LOG(INFO) << "rpc branch, res_buf size:" << res_buf.size();
         if (sock->Write(&res_buf, &wopt) != 0) {
             const int errcode = errno;
             PLOG_IF(WARNING, errcode != EPIPE) << "Fail to write into " << *sock;

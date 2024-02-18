@@ -330,6 +330,10 @@ int InputMessenger::ProcessNewMessage(
 }
 
 void InputMessenger::OnNewMessages(Socket* m) {
+    if(m->CreatedByConnect()) {
+        LOG(INFO) << "client socket skip read to make server side send buffer full, epollout bvar increase";
+        return;
+    }
     // Notes:
     // - If the socket has only one message, the message will be parsed and
     //   processed in this bthread. nova-pbrpc and http works in this way.

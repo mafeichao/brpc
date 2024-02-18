@@ -50,6 +50,8 @@ if((NOT BRPC_INCLUDE_PATH) OR (NOT BRPC_LIB))
     message(FATAL_ERROR "Fail to find brpc")
 endif()
 include_directories(${BRPC_INCLUDE_PATH})
+message("brpc inc:" ${BRPC_INCLUDE_PATH})
+message("brpc lib:" ${BRPC_LIB})
 
 find_path(GFLAGS_INCLUDE_PATH gflags/gflags.h)
 find_library(GFLAGS_LIBRARY NAMES gflags libgflags)

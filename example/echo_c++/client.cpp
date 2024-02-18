@@ -22,17 +22,21 @@
 #include <butil/time.h>
 #include <brpc/channel.h>
 #include "echo.pb.h"
+#include "brpc/server.h"
 
+DEFINE_int32(port, 8001, "TCP Port of metric server");
 DEFINE_string(attachment, "", "Carry this along with requests");
 DEFINE_string(protocol, "baidu_std", "Protocol type. Defined in src/brpc/options.proto");
 DEFINE_string(connection_type, "", "Connection type. Available values: single, pooled, short");
 DEFINE_string(server, "0.0.0.0:8000", "IP Address of server");
 DEFINE_string(load_balancer, "", "The algorithm for load balancing");
-DEFINE_int32(timeout_ms, 100, "RPC timeout in milliseconds");
+DEFINE_int32(timeout_ms, 2000, "RPC timeout in milliseconds");
 DEFINE_int32(max_retry, 3, "Max retries(not including the first RPC)"); 
 DEFINE_int32(interval_ms, 1000, "Milliseconds between consecutive requests");
 
 int main(int argc, char* argv[]) {
+    brpc::StartDummyServerAt(FLAGS_port/*port*/);
+
     // Parse gflags. We recommend you to use gflags as well.
     GFLAGS_NS::ParseCommandLineFlags(&argc, &argv, true);
     
@@ -45,6 +49,7 @@ int main(int argc, char* argv[]) {
     options.protocol = FLAGS_protocol;
     options.connection_type = FLAGS_connection_type;
     options.timeout_ms = FLAGS_timeout_ms/*milliseconds*/;
+    options.backup_request_ms = FLAGS_timeout_ms / 2;
     options.max_retry = FLAGS_max_retry;
     if (channel.Init(FLAGS_server.c_str(), FLAGS_load_balancer.c_str(), &options) != 0) {
         LOG(ERROR) << "Fail to initialize channel";
@@ -83,6 +88,10 @@ int main(int argc, char* argv[]) {
         } else {
             LOG(WARNING) << cntl.ErrorText();
         }
+        
+        //single模式只给server发一个请求，但是回包2M足够把recv buf耗尽，在client端不实际recv的时候可以观察到server端epollout的qps固定为20
+        //usleep(FLAGS_interval_ms * 1000L * 1000);
+
         usleep(FLAGS_interval_ms * 1000L);
     }
 

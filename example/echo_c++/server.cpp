@@ -17,6 +17,7 @@
 
 // A server to receive EchoRequest and send back EchoResponse.
 
+#include <thread>
 #include <gflags/gflags.h>
 #include <butil/logging.h>
 #include <brpc/server.h>
@@ -30,6 +31,7 @@ DEFINE_string(listen_addr, "", "Server listen address, may be IPV4/IPV6/UDS."
 DEFINE_int32(idle_timeout_s, -1, "Connection will be closed if there is no "
              "read/write operations during the last `idle_timeout_s'");
 
+char BUFF[1024 * 1024 * 10];
 // Your implementation of example::EchoService
 // Notice that implementing brpc::Describable grants the ability to put
 // additional information in /status.
@@ -54,6 +56,15 @@ public:
         cntl->set_after_rpc_resp_fn(std::bind(&EchoServiceImpl::CallAfterRpc,
             std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+        //加上超时之后，rpc的qps bvar变成0，error有值。去掉超时之后恢复正常，需要看看bvar的具体维护逻辑。
+        //std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+        //single模式，server端进入keepwrite一段时间之后，client端继续发请求但是不会再进入到Echo内部，这是为什么？
+        //short模式（pool在高qps下的退化模式），client超时就会close，server如果在read请求会感知对端的close造成读socket失败释放一次引用计数，
+        //         server发大包会触发keepwrite，只要keepwrite能被调度执行就会感知到对端的close造成写socket失败再释放一次引用计数，最终close
+        //         除非由于cpu过渡紧张无法调度keepwrite的bthread才会造成无法close，初步定位是bthread_worker_usage达到了物理机cpu核数限制
+        //server重启之后client的链接会自动恢复是如何做到的？
+
         // The purpose of following logs is to help you to understand
         // how clients interact with servers more intuitively. You should 
         // remove these logs in performance-sensitive servers.
@@ -64,7 +75,8 @@ public:
                   << " (attached=" << cntl->request_attachment() << ")";
 
         // Fill response.
-        response->set_message(request->message());
+        std::fill(BUFF, BUFF + sizeof(BUFF), 'a');
+        response->set_message(request->message() + ",msg:" + BUFF);
 
         // You can compress the response by setting Controller, but be aware
         // that compression may be costly, evaluate before turning on.
@@ -74,6 +86,9 @@ public:
             // Set attachment which is wired to network directly instead of
             // being serialized into protobuf messages.
             cntl->response_attachment().append(cntl->request_attachment());
+
+            std::fill(BUFF, BUFF + sizeof(BUFF), 'b');
+            cntl->response_attachment().append(BUFF);
         }
     }
 
@@ -87,7 +102,7 @@ public:
         json2pb::ProtoMessageToJson(*req, &req_str, NULL);
         json2pb::ProtoMessageToJson(*res, &res_str, NULL);
         LOG(INFO) << "req:" << req_str
-                    << " res:" << res_str;
+                    << " res:" << res_str.size();
     }
 };
 }  // namespace example

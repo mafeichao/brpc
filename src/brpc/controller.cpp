@@ -811,6 +811,7 @@ void Controller::Call::OnComplete(
             if (!sending_sock->is_read_progressive()) {
                 if (c->_stream_creator == NULL) {
                     sending_sock->SetFailed();
+                    LOG(INFO) << "short socket fail:" << *sending_sock;
                 }
             } else {
                 sending_sock->OnProgressiveReadCompleted();
@@ -1140,6 +1141,7 @@ void Controller::IssueRPC(int64_t start_realtime_us) {
         }
         tmp_sock.reset();
     }
+    LOG(INFO) << "sending socket:" << *_current_call.sending_sock;
     if (_tos > 0) {
         _current_call.sending_sock->set_type_of_service(_tos);
     }

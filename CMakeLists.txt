@@ -221,6 +221,13 @@ else()
     include_directories(${OPENSSL_INCLUDE_DIR})
 endif()
 
+message("open ssl inc:")
+message(${OPENSSL_INCLUDE_DIR})
+message("open ssl lib:")
+message(${OPENSSL_CRYPTO_LIBRARY})
+message("open ssl lib:")
+message(${OPENSSL_SSL_LIBRARY})
+
 include_directories(
         ${GFLAGS_INCLUDE_PATH}
         ${PROTOBUF_INCLUDE_DIRS}

@@ -151,6 +151,8 @@ struct ExtendedSocketStat : public SocketStat {
         uint32_t in_num_messages_s;
         uint32_t out_size_s;
         uint32_t out_num_messages_s;
+        uint64_t send_buf_size_s;
+        uint64_t recv_buf_size_s;
     };
     SparseMinuteCounter<Sampled> _minute_counter;
 
@@ -199,7 +201,7 @@ public:
     ~SharedPart();
 
     // Call this method every second (roughly)
-    void UpdateStatsEverySecond(int64_t now_ms);
+    void UpdateStatsEverySecond(int64_t now_ms, int fd);
 };
 
 Socket::SharedPart::SharedPart(SocketId creator_socket_id2)
@@ -220,7 +222,7 @@ Socket::SharedPart::~SharedPart() {
     delete socket_pool.exchange(NULL, butil::memory_order_relaxed);
 }
 
-void Socket::SharedPart::UpdateStatsEverySecond(int64_t now_ms) {
+void Socket::SharedPart::UpdateStatsEverySecond(int64_t now_ms, int fd) {
     ExtendedSocketStat* stat = extended_stat;
     if (stat == NULL) {
         stat = new (std::nothrow) ExtendedSocketStat;
@@ -236,6 +238,12 @@ void Socket::SharedPart::UpdateStatsEverySecond(int64_t now_ms) {
     const size_t out_sz = out_size.load(butil::memory_order_relaxed);
     const size_t out_nmsg = out_num_messages.load(butil::memory_order_relaxed);
 
+    uint32_t send_buf_size(0), recv_buf_size(0);
+    socklen_t opt_len = sizeof(uint32_t);
+    getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &send_buf_size, &opt_len);
+    getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &opt_len);
+    LOG(INFO) << "fd:" << fd << ",sendbuf:" << send_buf_size << ",recvbuf:" << recv_buf_size;
+
     // Notice that we don't normalize any data, mainly because normalization
     // often make data inaccurate and confuse users. This assumes that this
     // function is called exactly every second. This may not be true when the
@@ -245,6 +253,8 @@ void Socket::SharedPart::UpdateStatsEverySecond(int64_t now_ms) {
     stat->in_num_messages_s = in_nmsg - stat->last_in_num_messages;
     stat->out_size_s = out_sz - stat->last_out_size;
     stat->out_num_messages_s = out_nmsg - stat->last_out_num_messages;
+    stat->send_buf_size_s = send_buf_size;
+    stat->recv_buf_size_s = recv_buf_size;
     
     stat->last_in_size = in_sz;
     stat->last_in_num_messages = in_nmsg;
@@ -255,20 +265,27 @@ void Socket::SharedPart::UpdateStatsEverySecond(int64_t now_ms) {
     if (stat->in_size_s |/*bitwise or*/
         stat->in_num_messages_s |
         stat->out_size_s |
-        stat->out_num_messages_s) {
+        stat->out_num_messages_s |
+        stat->recv_buf_size_s |
+        stat->send_buf_size_s) {
         ExtendedSocketStat::Sampled s = {
             stat->in_size_s, stat->in_num_messages_s,
-            stat->out_size_s, stat->out_num_messages_s
+            stat->out_size_s, stat->out_num_messages_s,
+            stat->send_buf_size_s, stat->recv_buf_size_s
         };
         stat->in_size_m += s.in_size_s;
         stat->in_num_messages_m += s.in_num_messages_s;
         stat->out_size_m += s.out_size_s;
         stat->out_num_messages_m += s.out_num_messages_s;
+        stat->recv_buf_size_m += s.recv_buf_size_s;
+        stat->send_buf_size_m += s.send_buf_size_s;
         if (stat->_minute_counter.Add(now_ms, s, &popped)) {
             stat->in_size_m -= popped.in_size_s;
             stat->in_num_messages_m -= popped.in_num_messages_s;
             stat->out_size_m -= popped.out_size_s;
             stat->out_num_messages_m -= popped.out_num_messages_s;
+            stat->recv_buf_size_m -= popped.recv_buf_size_s;
+            stat->send_buf_size_m -= popped.send_buf_size_s;
         }
     }
     while (stat->_minute_counter.TryPop(now_ms, &popped)) {
@@ -276,6 +293,8 @@ void Socket::SharedPart::UpdateStatsEverySecond(int64_t now_ms) {
         stat->in_num_messages_m -= popped.in_num_messages_s;
         stat->out_size_m -= popped.out_size_s;
         stat->out_num_messages_m -= popped.out_num_messages_s;
+        stat->recv_buf_size_m -= popped.recv_buf_size_s;
+        stat->send_buf_size_m -= popped.send_buf_size_s;
     }
 }
 
@@ -1107,6 +1126,7 @@ void Socket::OnRecycle() {
         if (_on_edge_triggered_events != NULL) {
             GetGlobalEventDispatcher(prev_fd, _bthread_tag).RemoveConsumer(prev_fd);
         }
+        LOG(INFO) << "close fd:" << prev_fd;
         close(prev_fd);
         if (create_by_connect) {
             g_vars->channel_conn << -1;
@@ -1713,7 +1733,9 @@ int Socket::StartWrite(WriteRequest* req, const WriteOptions& opt) {
 #else
         {
 #endif
+            auto total_size = req->data.size();
             nw = req->data.cut_into_file_descriptor(fd());
+            LOG(INFO) << "write size:" << nw << ",total size:" << total_size << ",fd:" << fd();
         }
     }
     if (nw < 0) {
@@ -1733,6 +1755,7 @@ int Socket::StartWrite(WriteRequest* req, const WriteOptions& opt) {
         ReturnSuccessfulWriteRequest(req);
         return 0;
     }
+    LOG(INFO) << "keepwrite fd:" << fd();
 
 KEEPWRITE_IN_BACKGROUND:
     ReAddress(&ptr_for_keep_write);
@@ -1772,6 +1795,8 @@ void* Socket::KeepWrite(void* void_arg) {
             s->ReturnSuccessfulWriteRequest(saved_req);
         }
         const ssize_t nw = s->DoWrite(req);
+        LOG_EVERY_SECOND(INFO) << "keepwrite size:" << nw << ",fd:" << s->fd();
+
         if (nw < 0) {
             if (errno != EAGAIN && errno != EOVERCROWDED) {
                 const int saved_errno = errno;
@@ -2217,7 +2242,7 @@ void DereferenceSocket(Socket* s) {
 void Socket::UpdateStatsEverySecond(int64_t now_ms) {
     SharedPart* sp = GetSharedPart();
     if (sp) {
-        sp->UpdateStatsEverySecond(now_ms);
+        sp->UpdateStatsEverySecond(now_ms, _fd.load(butil::memory_order_consume));
     }
 }
 

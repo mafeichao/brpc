@@ -314,6 +314,7 @@ void Acceptor::OnNewConnectionsUntilEAGAIN(Socket* acception) {
 
         SocketUniquePtr sock;
         if (Socket::AddressFailedAsWell(socket_id, &sock) >= 0) {
+            LOG(INFO) << "fd(map):" << options.fd;
             bool is_running = true;
             {
                 BAIDU_SCOPED_LOCK(am->_map_mutex);
@@ -335,6 +336,7 @@ void Acceptor::OnNewConnectionsUntilEAGAIN(Socket* acception) {
             }
         } // else: The socket has already been destroyed, Don't add its id
           // into _socket_map
+          LOG(INFO) << "fd(no map):" << options.fd;
     }
 }
 
