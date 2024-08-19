@@ -45,6 +45,7 @@ void bthread_assign_data(void* data);
 
 
 namespace brpc {
+DECLARE_bool(log_all_socket_warning);
 namespace policy {
 
 DEFINE_bool(baidu_protocol_use_fullname, true,
@@ -262,7 +263,11 @@ void SendRpcResponse(int64_t correlation_id,
         wopt.ignore_eovercrowded = true;
         if (sock->Write(&res_buf, &wopt) != 0) {
             const int errcode = errno;
-            PLOG_IF(WARNING, errcode != EPIPE) << "Fail to write into " << *sock;
+            if(FLAGS_log_all_socket_warning) {
+                PLOG_IF(WARNING, errcode != EPIPE) << "Fail to write into " << *sock;
+            } else {
+                PLOG_IF_EVERY_SECOND(WARNING, errcode != EPIPE) << "Fail to write into " << *sock;
+            }
             cntl->SetFailed(errcode, "Fail to write into %s",
                             sock->description().c_str());
             return;

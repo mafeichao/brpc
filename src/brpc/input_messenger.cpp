@@ -32,6 +32,7 @@
 
 
 namespace brpc {
+DECLARE_bool(log_all_socket_warning);
 
 InputMessenger* g_messenger = NULL;
 static pthread_once_t g_messenger_init = PTHREAD_ONCE_INIT;
@@ -359,7 +360,12 @@ void InputMessenger::OnNewMessages(Socket* m) {
                     continue;  // just retry
                 }
                 const int saved_errno = errno;
-                PLOG(WARNING) << "Fail to read from " << *m;
+                
+                if(FLAGS_log_all_socket_warning) {
+                    PLOG(WARNING) << "Fail to read from " << *m;
+                } else {
+                    PLOG_EVERY_SECOND(WARNING) << "Fail to read from " << *m;
+                }
                 m->SetFailed(saved_errno, "Fail to read from %s: %s",
                              m->description().c_str(), berror(saved_errno));
                 return;

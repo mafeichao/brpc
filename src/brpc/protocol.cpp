@@ -49,6 +49,9 @@ DEFINE_bool(log_error_text, false,
             " respond a failed RPC");
 BRPC_VALIDATE_GFLAG(log_error_text, PassValidate);
 
+DEFINE_bool(log_all_socket_warning, false, "wheather log all socket warning");
+BRPC_VALIDATE_GFLAG(log_all_socket_warning, PassValidate);
+
 // Not using ProtocolType_MAX as the boundary because others may define new
 // protocols outside brpc.
 const size_t MAX_PROTOCOL_SIZE = 128;
