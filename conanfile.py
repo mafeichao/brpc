@@ -1,9 +1,12 @@
 import os
 from conans import ConanFile, tools
 
+#conan create .
+#conan upload brpc/1.4.0.ps.1@user/stable --all --force -r mlp
+
 in_gitlab = False
 
-version = "local_test"
+version = "1.4.0.ps.1"
 tag = "release"
 
 if "CI_BUILD_TAG" in os.environ:

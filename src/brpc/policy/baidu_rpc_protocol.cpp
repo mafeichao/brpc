@@ -266,7 +266,7 @@ void SendRpcResponse(int64_t correlation_id,
             if(FLAGS_log_all_socket_warning) {
                 PLOG_IF(WARNING, errcode != EPIPE) << "Fail to write into " << *sock;
             } else {
-                PLOG_IF_EVERY_SECOND(WARNING, errcode != EPIPE) << "Fail to write into " << *sock;
+                PLOG_IF_EVERY_N(WARNING, errcode != EPIPE, 1000) << "Fail to write into " << *sock;
             }
             cntl->SetFailed(errcode, "Fail to write into %s",
                             sock->description().c_str());

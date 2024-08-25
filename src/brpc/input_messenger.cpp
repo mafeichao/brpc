@@ -364,7 +364,7 @@ void InputMessenger::OnNewMessages(Socket* m) {
                 if(FLAGS_log_all_socket_warning) {
                     PLOG(WARNING) << "Fail to read from " << *m;
                 } else {
-                    PLOG_EVERY_SECOND(WARNING) << "Fail to read from " << *m;
+                    PLOG_EVERY_N(WARNING, 1000) << "Fail to read from " << *m;
                 }
                 m->SetFailed(saved_errno, "Fail to read from %s: %s",
                              m->description().c_str(), berror(saved_errno));
